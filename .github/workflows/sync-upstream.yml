@@ -1,0 +1,82 @@
+name: sync-upstream
+
+# Keeps the unodos/oidc fork in step with upstream chatwoot/chatwoot.
+# On a schedule (or manually), it finds the newest upstream v* tag that is not yet
+# merged into unodos/oidc and opens a PR merging that tag in. The diff is normally
+# tiny because the fork's OIDC patch is one isolated, env-gated commit.
+#
+# Usage:
+#   - Runs weekly (Monday 06:00 UTC) or via "Run workflow" (workflow_dispatch).
+#   - The PR is opened with the default GITHUB_TOKEN (no extra secrets needed).
+#   - Merge the PR after reviewing; build-image.yml then publishes the new image.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Monday 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork (full history + tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: unodos/oidc
+
+      - name: Fetch upstream tags
+        run: |
+          git remote add upstream https://github.com/chatwoot/chatwoot.git
+          git fetch upstream --tags --prune --force
+
+      - name: Find latest upstream tag vs current base
+        id: versions
+        run: |
+          latest=$(git for-each-ref refs/remotes/upstream/tags --sort=-version:refname \
+            --format='%(refname:short)' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          current=$(git describe --tags --abbrev=0 2>/dev/null || echo none)
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+
+      - name: Open sync PR (if a newer tag exists)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          latest="${{ steps.versions.outputs.latest }}"
+          current="${{ steps.versions.outputs.current }}"
+          echo "current base: $current"
+          echo "latest upstream: $latest"
+          if [ "$latest" = "$current" ] || [ -z "$latest" ]; then
+            echo "Already on the latest tag — nothing to do."
+            exit 0
+          fi
+          if gh pr list --state open --head "merge/upstream-${latest}" --json number --jq 'length' | grep -q '^[1-9]'; then
+            echo "PR for ${latest} already open."
+            exit 0
+          fi
+          branch="merge/upstream-${latest}"
+          git checkout -b "$branch" unodos/oidc
+          git merge --no-edit "upstream/${latest}"
+          git push -u origin "$branch"
+          # Summarize what changed since the current base
+          summary=$(git log --oneline --no-decorate "${current}..upstream/${latest}" | head -40)
+          gh pr create \
+            --base unodos/oidc \
+            --head "$branch" \
+            --title "chore: sync upstream ${latest} (from ${current})" \
+            --body "Merges upstream [${latest}](https://github.com/chatwoot/chatwoot/releases/tag/${latest}) into \`unodos/oidc\`.
+
+**Commits in this range** (first 40):
+\`\`\`
+$summary
+\`\`\`
+
+**Before merging:**
+1. Read the [upstream release notes](https://github.com/chatwoot/chatwoot/releases/tag/${latest}) — note any migrations/breaking changes.
+2. Confirm the OIDC diff is still one isolated commit: \`git diff ${latest} -- custom/ Gemfile config/initializers/omniauth.rb app/models/user.rb app/controllers/dashboard_controller.rb config/application.rb app/javascript/v3/views/login/Index.vue\`
+3. Merge → \`build-image.yml\` publishes \`v${latest}-oidc.N\`; then deploy per the runbook (\`docs/oidc-sso.md\` → Upgrade procedure)."

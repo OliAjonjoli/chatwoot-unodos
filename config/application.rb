@@ -52,6 +52,14 @@ module Chatwoot
     enterprise_initializers = Rails.root.join('enterprise/config/initializers')
     Dir[enterprise_initializers.join('**/*.rb')].each { |f| require f } if enterprise_initializers.exist?
 
+    # Uno Dos Cloud fork: load custom/ extensions (OIDC SSO) alongside enterprise.
+    # custom/ marks ChatwootApp.custom? → ChatwootApp.extensions includes 'custom',
+    # so prepend_mod_with('...') picks up Custom:: modules (e.g. the omniauth callback mod).
+    config.eager_load_paths += Dir["#{Rails.root}/custom/app/**"]
+    config.paths['app/views'].unshift('custom/app/views') if Rails.root.join('custom/app/views').exist?
+    custom_initializers = Rails.root.join('custom/config/initializers')
+    Dir[custom_initializers.join('**/*.rb')].each { |f| require f } if custom_initializers.exist?
+
     # Settings in config/environments/* take precedence over those specified here.
     # Application configuration can go into files in config/initializers
     # -- all .rb files in that directory are automatically loaded after loading

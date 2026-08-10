@@ -98,6 +98,8 @@ class DashboardController < ActionController::Base
     methods = ['email']
     methods << 'google_oauth' if GlobalConfigService.load('ENABLE_GOOGLE_OAUTH_LOGIN', 'true').to_s != 'false'
     methods << 'saml' if ChatwootHub.pricing_plan != 'community' && GlobalConfigService.load('ENABLE_SAML_SSO_LOGIN', 'true').to_s != 'false'
+    # Uno Dos Cloud fork: OpenID Connect (Authentik) — env-gated, no license check
+    methods << 'openid_connect' if ENV['OPENID_CONNECT_ISSUER'].present? && GlobalConfigService.load('ENABLE_OIDC_LOGIN', 'true').to_s != 'false'
     methods
   end
 

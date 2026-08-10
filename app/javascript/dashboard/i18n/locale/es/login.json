@@ -20,6 +20,9 @@
       "BUSINESS_ACCOUNTS_ONLY": "Por favor, utiliza el correo electrónico de tu empresa para iniciar sesión",
       "NO_ACCOUNT_FOUND": "No pudimos encontrar una cuenta para tu dirección de correo electrónico."
     },
+    "OIDC": {
+      "LABEL": "Continuar con SSO (Authentik)"
+    },
     "FORGOT_PASSWORD": "¿Olvidaste tu contraseña?",
     "CREATE_NEW_ACCOUNT": "Crear nueva cuenta",
     "SUBMIT": "Iniciar sesión",
