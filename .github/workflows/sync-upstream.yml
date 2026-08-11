@@ -65,18 +65,22 @@ jobs:
           git push -u origin "$branch"
           # Summarize what changed since the current base
           summary=$(git log --oneline --no-decorate "${current}..upstream/${latest}" | head -40)
+          cat > /tmp/pr-body.md <<EOF
+          Merges upstream [${latest}](https://github.com/chatwoot/chatwoot/releases/tag/${latest}) into \`unodos/oidc\`.
+
+          **Commits in this range** (first 40):
+
+          \`\`\`
+          $summary
+          \`\`\`
+
+          **Before merging:**
+          1. Read the upstream release notes — note any migrations/breaking changes.
+          2. Confirm the OIDC diff is still one isolated commit: \`git diff ${latest} -- custom/ Gemfile config/initializers/omniauth.rb app/models/user.rb app/controllers/dashboard_controller.rb config/application.rb app/javascript/v3/views/login/Index.vue\`
+          3. Merge → \`build-image.yml\` publishes \`v${latest}-oidc.N\`; then deploy per the runbook (\`docs/oidc-sso.md\` → Upgrade procedure).
+          EOF
           gh pr create \
             --base unodos/oidc \
             --head "$branch" \
             --title "chore: sync upstream ${latest} (from ${current})" \
-            --body "Merges upstream [${latest}](https://github.com/chatwoot/chatwoot/releases/tag/${latest}) into \`unodos/oidc\`.
-
-**Commits in this range** (first 40):
-\`\`\`
-$summary
-\`\`\`
-
-**Before merging:**
-1. Read the [upstream release notes](https://github.com/chatwoot/chatwoot/releases/tag/${latest}) — note any migrations/breaking changes.
-2. Confirm the OIDC diff is still one isolated commit: \`git diff ${latest} -- custom/ Gemfile config/initializers/omniauth.rb app/models/user.rb app/controllers/dashboard_controller.rb config/application.rb app/javascript/v3/views/login/Index.vue\`
-3. Merge → \`build-image.yml\` publishes \`v${latest}-oidc.N\`; then deploy per the runbook (\`docs/oidc-sso.md\` → Upgrade procedure)."
+            --body-file /tmp/pr-body.md
