@@ -157,3 +157,12 @@ docker build -f docker/Dockerfile -t ghcr.io/<owner>/<repo>:v<new-tag>-oidc.<n> 
 - **Upstream OIDC** is on Chatwoot's roadmap (#11288/#12541). When it lands, this patch
   can likely be dropped — track it before each merge.
 - Full E2E with the real Authentik/M365 identity is the one manual step in the pipeline.
+
+## 9. Debug notes (from go-live)
+
+- **Authentik `invalid_request` / "Invalid grant_type for provider"** on authorize →
+  the provider's `grant_types` was empty; PATCH it to `["authorization_code", "refresh_token"]`.
+- **500 `ActionDispatch::Cookies::CookieOverflow`** on the callback → DeviseTokenAuth's
+  `redirect_callbacks` stashes the whole auth hash in the cookie session (OIDC auth hash
+  ~8KB > 4KB). The fork's `Custom::DeviseOverrides::OmniauthCallbacksController#redirect_callbacks`
+  bypasses the stash for `openid_connect`, mirroring the Enterprise SAML module.
