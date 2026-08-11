@@ -4,8 +4,10 @@ Uno Dos Cloud fork of `chatwoot/chatwoot` with an **env-gated OpenID Connect str
 for agent SSO via Authentik (mode B, the same pattern as Frappe/Zammad/Leads).
 
 - **Fork:** this repo — branch `unodos/oidc`, based on upstream tag (currently `v4.16.2`)
+- **Maintainer / first contributor:** [@OliAjonjoli](https://github.com/OliAjonjoli)
 - **Image:** `ghcr.io/<owner>/<repo>:v<upstream>-oidc.<run>` (built by `build-image.yml`)
 - **Related:** `unodos.cloud/docs/platform/frappe-sso.md` (SAML path, premium-gated — superseded by OIDC), `unodos.cloud/chat/README.md` (deployment)
+- **Overview of fork enhancements:** root [`README.md`](../README.md) (top section)
 
 ---
 
@@ -166,3 +168,10 @@ docker build -f docker/Dockerfile -t ghcr.io/<owner>/<repo>:v<new-tag>-oidc.<n> 
   `redirect_callbacks` stashes the whole auth hash in the cookie session (OIDC auth hash
   ~8KB > 4KB). The fork's `Custom::DeviseOverrides::OmniauthCallbacksController#redirect_callbacks`
   bypasses the stash for `openid_connect`, mirroring the Enterprise SAML module.
+- **`/app/login?error=no-account-found` after a successful Authentik login** → the custom
+  OIDC handler was skipped and stock Chatwoot took over (signup disabled → that error).
+  Root cause (fixed): OmniAuth strategy `name: :openid_connect` puts a **Symbol** on
+  `auth_hash['provider']`, and `== 'openid_connect'` (String) is false, so the code fell
+  through to `sign_up_user`. Fix: compare with `.to_s` and set `name: 'openid_connect'`.
+  Distinct from `oidc-authentication-failed` (custom handler ran but email missing / no
+  matching user and JIT off).

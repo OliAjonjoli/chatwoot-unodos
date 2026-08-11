@@ -12,7 +12,9 @@ Rails.application.config.middleware.use OmniAuth::Builder do
   # exactly like stock Chatwoot (env-gated so one image serves both modes).
   if ENV['OPENID_CONNECT_ISSUER'].present?
     provider :openid_connect, {
-      name: :openid_connect,
+      # String name so auth_hash['provider'] is 'openid_connect' (not :openid_connect).
+      # The custom callback also compares via .to_s as a belt-and-suspenders guard.
+      name: 'openid_connect',
       issuer: ENV['OPENID_CONNECT_ISSUER'],
       scope: ENV.fetch('OPENID_CONNECT_SCOPE', 'openid email profile'),
       response_type: :code,

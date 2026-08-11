@@ -1,11 +1,117 @@
-<img src="./.github/screenshots/header.png#gh-light-mode-only" width="100%" alt="Header light mode"/>
-<img src="./.github/screenshots/header-dark.png#gh-dark-mode-only" width="100%" alt="Header dark mode"/>
+# Chatwoot · Uno Dos Cloud fork
 
-___
+**Fork of [chatwoot/chatwoot](https://github.com/chatwoot/chatwoot)** with **env-gated OpenID Connect (OIDC) agent SSO** for [Authentik](https://goauthentik.io/) and other standard OIDC providers.
 
-# Chatwoot
+| | |
+|--|--|
+| **Upstream** | [chatwoot/chatwoot](https://github.com/chatwoot/chatwoot) (MIT) |
+| **Default branch** | `unodos/oidc` (based on upstream `v4.16.2` + continuous sync) |
+| **Maintainer / first contributor** | [**@OliAjonjoli**](https://github.com/OliAjonjoli) — Uno Dos Cloud |
+| **OIDC runbook** | [`docs/oidc-sso.md`](./docs/oidc-sso.md) |
+| **Custom layer** | [`custom/`](./custom/) |
+
+> When OIDC env vars are **unset**, this image behaves exactly like stock Chatwoot. One image, two modes — flip env to enable or roll back SSO without changing the image.
+
+---
+
+## Fork enhancements (Uno Dos Cloud)
+
+These are the **individual changes** on top of upstream Chatwoot. Everything below this section is stock Chatwoot documentation.
+
+### 1. Agent SSO via OpenID Connect (Authentik)
+
+Upstream Chatwoot ships Google OAuth and **premium-gated SAML** only. This fork adds a full **OIDC authorization-code** strategy for agents:
+
+- Login button: **Continue with SSO (Authentik)** on `/app/login`
+- OmniAuth strategy `openid_connect` (code flow + discovery)
+- Callback handled in `Custom::DeviseOverrides::OmniauthCallbacksController`
+- Users matched **by email** (case-insensitive), consistent with the rest of the Uno Dos Cloud platform
+
+| Env | Purpose |
+|-----|---------|
+| `OPENID_CONNECT_ISSUER` | Enable OIDC (Authentik per-app issuer URL) |
+| `OPENID_CONNECT_CLIENT_ID` / `OPENID_CONNECT_CLIENT_SECRET` | Confidential client credentials |
+| `OPENID_CONNECT_SCOPE` | Default `openid email profile` |
+| `ENABLE_OIDC_LOGIN` | Hide the button without unregistering the strategy (`false`) |
+
+### 2. Optional JIT agent provisioning
+
+| Env | Purpose |
+|-----|---------|
+| `OPENID_CONNECT_JIT_ACCOUNT_ID` | Auto-create agents into this Chatwoot account on first SSO login |
+
+- **Set** → unknown emails are created as agents in that account  
+- **Unset** → strict mode: the agent must already exist (Settings → Agents)
+
+Implemented in `Custom::OidcUserBuilder` (`custom/app/builders/`).
+
+### 3. Production hardening (Authentik + OmniAuth 2.x)
+
+Fixes discovered while integrating Authentik in production:
+
+| Issue | Fix |
+|-------|-----|
+| Login button GET → 404 (OmniAuth 2 defaults to POST only) | Allow GET when OIDC is on (`custom/config/initializers/oidc.rb`) |
+| `CookieOverflow` on callback (OIDC auth hash ~8KB) | Bypass DeviseTokenAuth session-stash 307 for `openid_connect` (handle callback in-request) |
+| `?error=no-account-found` after successful IdP login | Compare `auth_hash['provider']` with `.to_s` — OmniAuth may store a Symbol; stock signup path was wrongly hit when signup is disabled |
+| Authentik `invalid_request` / empty grant types | Documented: provider needs `authorization_code` (+ `refresh_token`) |
+
+### 4. Upstream-friendly layout
+
+Fork logic lives almost entirely under **`custom/`**, using Chatwoot’s own `prepend_mod_with` extension mechanism (same pattern as `enterprise/`):
+
+- Small additive core touch points only (Gemfile, `omniauth.rb`, `User` omniauth providers, login page, dashboard allowed methods)
+- Env-gated so merges from upstream stay simple
+- CI workflows: `build-image` (GHCR tags) + `sync-upstream` (PR when new `v*` tags appear)
+
+### 5. Docs
+
+- **[`docs/oidc-sso.md`](./docs/oidc-sso.md)** — full runbook (env contract, Authentik setup, verify, upgrade, rollback, debug notes)
+- **[`custom/README.md`](./custom/README.md)** — what lives in the custom layer
+
+### Quick start (OIDC)
+
+```bash
+# .env (rails + sidekiq)
+OPENID_CONNECT_ISSUER=https://sso.example.com/application/o/chatwoot/
+OPENID_CONNECT_CLIENT_ID=…
+OPENID_CONNECT_CLIENT_SECRET=…
+OPENID_CONNECT_JIT_ACCOUNT_ID=2   # optional
+ENABLE_OIDC_LOGIN=true
+```
+
+Authentik redirect URI (strict):
+
+```text
+https://<your-chatwoot-host>/omniauth/openid_connect/callback
+```
+
+See [`docs/oidc-sso.md`](./docs/oidc-sso.md) for the complete checklist.
+
+### Contributors (this fork)
+
+| Contributor | Role |
+|-------------|------|
+| [**@OliAjonjoli**](https://github.com/OliAjonjoli) | Creator & first contributor — OIDC SSO fork, Authentik integration, production hardening |
+
+Upstream Chatwoot has hundreds of contributors; see [chatwoot.com/docs/contributors](https://www.chatwoot.com/docs/contributors).
+
+---
+
+## Branching (this fork)
+
+| Branch | Purpose |
+|--------|---------|
+| `unodos/oidc` | **Default** — upstream release tag + OIDC commits |
+| upstream `develop` / `master` / `v*` | Synced via `sync-upstream` workflow when new tags ship |
+
+---
+
+# Upstream Chatwoot
 
 The modern customer support platform, an open-source alternative to Intercom, Zendesk, Salesforce Service Cloud etc.
+
+> The badges and screenshots below refer to **upstream** [chatwoot/chatwoot](https://github.com/chatwoot/chatwoot).
 
 <p>
   <img src="https://img.shields.io/circleci/build/github/chatwoot/chatwoot" alt="CircleCI Badge">
@@ -17,16 +123,6 @@ The modern customer support platform, an open-source alternative to Intercom, Ze
   <a href="https://status.chatwoot.com"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fchatwoot%2Fstatus%2Fmaster%2Fapi%2Fchatwoot%2Fuptime.json" alt="uptime"></a>
   <a href="https://status.chatwoot.com"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fchatwoot%2Fstatus%2Fmaster%2Fapi%2Fchatwoot%2Fresponse-time.json" alt="response time"></a>
   <a href="https://artifacthub.io/packages/helm/chatwoot/chatwoot"><img src="https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/artifact-hub" alt="Artifact HUB"></a>
-</p>
-
-
-<p>
-  <a href="https://heroku.com/deploy?template=https://github.com/chatwoot/chatwoot/tree/master" alt="Deploy to Heroku">
-     <img width="150" alt="Deploy" src="https://www.herokucdn.com/deploy/button.svg"/>
-  </a>
-  <a href="https://marketplace.digitalocean.com/apps/chatwoot?refcode=f2238426a2a8" alt="Deploy to DigitalOcean">
-     <img width="200" alt="Deploy to DO" src="https://www.deploytodo.com/do-btn-blue.svg"/>
-  </a>
 </p>
 
 <img src="./.github/screenshots/dashboard.png#gh-light-mode-only" width="100%" alt="Chat dashboard dark mode"/>
@@ -89,14 +185,18 @@ Publish help articles, FAQs, and guides through the built-in Help Center Portal.
 
 Detailed documentation is available at [chatwoot.com/help-center](https://www.chatwoot.com/help-center).
 
+**This fork’s OIDC docs:** [`docs/oidc-sso.md`](./docs/oidc-sso.md).
+
 ## Translation process
 
 The translation process for Chatwoot web and mobile app is managed at [https://translate.chatwoot.com](https://translate.chatwoot.com) using Crowdin. Please read the [translation guide](https://www.chatwoot.com/docs/contributing/translating-chatwoot-to-your-language) for contributing to Chatwoot.
 
 ## Branching model
 
-We use the [git-flow](https://nvie.com/posts/a-successful-git-branching-model/) branching model. The base branch is `develop`.
+Upstream Chatwoot uses the [git-flow](https://nvie.com/posts/a-successful-git-branching-model/) branching model. The base branch is `develop`.
 If you are looking for a stable version, please use the `master` or tags labelled as `v1.x.x`.
+
+**This fork** defaults to `unodos/oidc` (see table at the top of this file).
 
 ## Deployment
 
@@ -131,9 +231,13 @@ If you need help or just want to hang out, come, say hi on our [Discord](https:/
 
 ## Contributors
 
-Thanks goes to all these [wonderful people](https://www.chatwoot.com/docs/contributors):
+**This fork:** first contributor [**@OliAjonjoli**](https://github.com/OliAjonjoli).
+
+Upstream Chatwoot thanks goes to all these [wonderful people](https://www.chatwoot.com/docs/contributors):
 
 <a href="https://github.com/chatwoot/chatwoot/graphs/contributors"><img src="https://opencollective.com/chatwoot/contributors.svg?width=890&button=false" /></a>
 
 
 *Chatwoot* &copy; 2017-2026, Chatwoot Inc - Released under the MIT License.
+
+*Uno Dos Cloud OIDC fork* — additional work by [@OliAjonjoli](https://github.com/OliAjonjoli).

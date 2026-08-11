@@ -15,7 +15,11 @@ module Custom
   module DeviseOverrides
     module OmniauthCallbacksController
       def omniauth_success
-        return handle_oidc_auth if auth_hash&.dig('provider') == 'openid_connect'
+        # OmniAuth stores strategy `name: :openid_connect` as a Symbol on the auth
+        # hash. Strict `== 'openid_connect'` (String) fails and falls through to the
+        # stock Google-style signup path → `/app/login?error=no-account-found` when
+        # ENABLE_ACCOUNT_SIGNUP=false. Always compare as string.
+        return handle_oidc_auth if auth_hash&.dig('provider').to_s == 'openid_connect'
 
         super
       end

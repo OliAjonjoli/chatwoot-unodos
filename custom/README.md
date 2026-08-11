@@ -1,5 +1,7 @@
 # Uno Dos Cloud fork — `custom/` extensions
 
+**Maintainer / first contributor:** [@OliAjonjoli](https://github.com/OliAjonjoli)
+
 This directory is the Uno Dos Cloud fork's customization layer. It uses Chatwoot's
 own extension mechanism (`prepend_mod_with`), the same way `enterprise/` works:
 
