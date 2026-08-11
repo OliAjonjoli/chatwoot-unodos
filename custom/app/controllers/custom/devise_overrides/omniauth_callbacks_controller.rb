@@ -20,6 +20,18 @@ module Custom
         super
       end
 
+      # Bypass DeviseTokenAuth's session-stash + 307 dance for OIDC — the same approach
+      # the Enterprise SAML module uses. The OIDC auth hash (raw userinfo, tokens) is far
+      # too large for the cookie session store (ActionDispatch::Cookies::CookieOverflow,
+      # ~8KB > 4KB limit), so we must not stash it in the session. Handle the callback
+      # in this request instead: env['omniauth.auth'] is already populated by the
+      # OmniAuth middleware before this route runs.
+      def redirect_callbacks
+        return omniauth_success if params[:provider] == 'openid_connect'
+
+        super
+      end
+
       private
 
       def handle_oidc_auth
