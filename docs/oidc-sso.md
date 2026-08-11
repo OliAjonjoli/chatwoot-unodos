@@ -26,7 +26,7 @@ your rollback path (flip env, not image).
 ### Auth flow
 
 ```text
-Agent → /app/login → "Continue with SSO (Authentik)" → /omniauth/openid_connect
+Agent → /app/login → "Continue with SSO (Authentik)" → /omniauth/openid_connect (GET)
   → Authentik authorize (M365 login, group policy) → code callback
   → /omniauth/openid_connect/callback → 307 → /auth/openid_connect/callback
   → Custom::DeviseOverrides::OmniauthCallbacksController#omniauth_success
@@ -36,6 +36,12 @@ Agent → /app/login → "Continue with SSO (Authentik)" → /omniauth/openid_co
 
 The fork hooks Chatwoot's own extension mechanism (`prepend_mod_with` + the `custom/`
 dir) — the same way `enterprise/` adds SAML — so upstream merges stay trivial.
+
+> **Why the GET is allowed:** OmniAuth 2.x defaults `allowed_request_methods` to
+> `[:post]`, which would reject the login button's plain GET link (404 via Devise
+> passthru). `custom/config/initializers/oidc.rb` re-enables GET when OIDC is on —
+> the same pattern Chatwoot's enterprise SAML flow relies on. The strategy still
+> validates `state`/`nonce` in the session before exchanging the code.
 
 ## 2. Environment contract
 
