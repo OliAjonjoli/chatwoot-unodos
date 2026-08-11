@@ -65,7 +65,10 @@ Create via the Admin UI or the documented REST-API pattern (`frappe-sso.md` §8)
 
 1. **Provider — OIDC** (confidential client):
    - Client type: **confidential**
-   - Grant types: `authorization_code`, `refresh_token`
+   - **Grant types: `authorization_code`, `refresh_token`** ⚠️ — Authentik (2026.x) defaults
+     `grant_types` to empty; without this the authorize endpoint answers
+     `invalid_request` / "Invalid grant_type for provider". Set it via the API:
+     `PATCH /api/v3/providers/oauth2/<pk> -d '{"grant_types": ["authorization_code", "refresh_token"]}'`
    - Redirect URIs (strict): `https://chat.unodos.cloud/omniauth/openid_connect/callback`
    - Signing key: reuse the shared provider signing key (`e265bc97-…`) if it must
      interop; otherwise the default is fine
